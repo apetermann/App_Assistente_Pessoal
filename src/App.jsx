@@ -445,7 +445,6 @@ function LoadingBrief({ meeting, loading }) {
       <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:28 }}>
         {steps.map((s) => {
           const active = loading[s.key];
-          const finished = !active && !loading.readai && !loading.gmail && !loading.brief;
           return (
             <div key={s.key} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 16px", borderRadius:8, border:`1px solid ${active?"rgba(28,53,87,.2)":"rgba(0,0,0,.06)"}`, background:active?"rgba(28,53,87,.04)":"rgba(255,255,255,.6)", transition:"all .3s" }}>
               <div style={{ width:8, height:8, borderRadius:"50%", background: active?"#1C3557":"rgba(26,31,46,.18)", flexShrink:0, animation: active?"pulse 1.2s ease-in-out infinite":"none" }} />
