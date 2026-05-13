@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const MODEL         = "claude-3-5-sonnet-20241022";
 const READ_AI_BASE  = "https://api.read.ai/api/v1";
 const GCAL          = "https://www.googleapis.com/calendar/v3";
 const GMAIL         = "https://www.googleapis.com/gmail/v1";
