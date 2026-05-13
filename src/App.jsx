@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 // ─────────────────────────────────────────────────
 // CONSTANTS
@@ -89,7 +89,6 @@ export default function App() {
   const [demoMode, setDemoMode] = useState(false);
   const [pastCount, setPastCount] = useState(0);
   const [gmailCount, setGmailCount] = useState(0);
-  const [loadStep, setLoadStep] = useState("");
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -98,6 +97,7 @@ export default function App() {
     document.head.appendChild(link);
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchCal(tab); }, [tab]);
 
   async function callClaude(system, messages, mcpServers = []) {
@@ -267,15 +267,11 @@ Use TODO o contexto acima (reuniões passadas + e-mails) para gerar um briefing 
     setBrief(null);
     setPastCount(0);
     setGmailCount(0);
-    setLoadStep("collecting");
-    // Read AI + Gmail em paralelo
     const [past, gmailThreads] = await Promise.all([
       fetchReadAiMeetings(m),
       fetchGmailContext(m),
     ]);
-    setLoadStep("brief");
     await generateBrief(m, past, gmailThreads);
-    setLoadStep("");
   }
 
   const nowStr = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -434,12 +430,10 @@ function Splash() {
 
 function LoadingBrief({ meeting, loading }) {
   const steps = [
-    { key: "readai", icon: "◈", label: "Read AI — buscando reuniões anteriores", done: !loading.readai },
-    { key: "gmail",  icon: "✉",  label: "Gmail — buscando e-mails relevantes",   done: !loading.gmail  },
-    { key: "brief",  icon: "◉", label: "IA — gerando briefing estratégico",       done: !loading.brief  },
+    { key: "readai", label: "Read AI — buscando reuniões anteriores" },
+    { key: "gmail",  label: "Gmail — buscando e-mails relevantes"   },
+    { key: "brief",  label: "IA — gerando briefing estratégico"      },
   ];
-  const anyCollecting = loading.readai || loading.gmail;
-  const onlyBrief = !anyCollecting && loading.brief;
   return (
     <div>
       <div style={{ marginBottom:24 }}>
@@ -451,7 +445,7 @@ function LoadingBrief({ meeting, loading }) {
       <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:28 }}>
         {steps.map((s) => {
           const active = loading[s.key];
-          const done   = !active && (s.key !== "brief" ? true : !loading.readai && !loading.gmail);
+          const finished = !active && !loading.readai && !loading.gmail && !loading.brief;
           return (
             <div key={s.key} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 16px", borderRadius:8, border:`1px solid ${active?"rgba(28,53,87,.2)":"rgba(0,0,0,.06)"}`, background:active?"rgba(28,53,87,.04)":"rgba(255,255,255,.6)", transition:"all .3s" }}>
               <div style={{ width:8, height:8, borderRadius:"50%", background: active?"#1C3557":"rgba(26,31,46,.18)", flexShrink:0, animation: active?"pulse 1.2s ease-in-out infinite":"none" }} />
