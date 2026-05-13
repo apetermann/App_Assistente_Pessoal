@@ -64,14 +64,12 @@ const lsDel = k         => { try { localStorage.removeItem(k); } catch {} };
 // MAIN APP
 // ─────────────────────────────────────────────────
 export default function App() {
-  const [anthropicKey,    setAnthropicKey]    = useState(()=>ls("mi_ak")||process.env.REACT_APP_ANTHROPIC_API_KEY||"");
   const [readAiKey,       setReadAiKey]       = useState(()=>ls("mi_rk"));
   const [googleToken,     setGoogleToken]     = useState(()=>ls("mi_gt"));
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleReady,     setGoogleReady]     = useState(false);
   const tokenClientRef = useRef(null);
 
-  const [draftAk, setDraftAk] = useState("");
   const [draftRk, setDraftRk] = useState("");
 
   const [showSetup,       setShowSetup]       = useState(false);
@@ -118,20 +116,19 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{ fetchCal(tab); },[tab,googleConnected]);
 
-  function openSetup()  { setDraftAk(anthropicKey); setDraftRk(readAiKey); setShowSetup(true); }
-  function saveSettings(){ if(draftAk.trim()){setAnthropicKey(draftAk.trim());lsSet("mi_ak",draftAk.trim());} if(draftRk.trim()){setReadAiKey(draftRk.trim());lsSet("mi_rk",draftRk.trim());} setShowSetup(false); }
+  function openSetup()  { setDraftRk(readAiKey); setShowSetup(true); }
+  function saveSettings(){ if(draftRk.trim()){setReadAiKey(draftRk.trim());lsSet("mi_rk",draftRk.trim());} setShowSetup(false); }
   function connectGoogle()   { if(tokenClientRef.current) tokenClientRef.current.requestAccessToken(); }
   function disconnectGoogle(){ setGoogleToken(""); setGoogleConnected(false); lsDel("mi_gt"); setMeetings(mockMeetings(tab)); setDemoMode(true); }
 
   async function callClaude(system, messages) {
-    if(!anthropicKey) throw new Error("Configure sua Anthropic API Key em ⚙ Configurar");
-    const res=await fetch(ANTHROPIC_API,{
+    const res=await fetch("/api/brief",{
       method:"POST",
-      headers:{"Content-Type":"application/json","x-api-key":anthropicKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-      body:JSON.stringify({model:MODEL,max_tokens:1000,system,messages})
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({system,messages})
     });
-    if(!res.ok){const e=await res.json().catch(()=>({})); throw new Error(e.error?.message||`Erro ${res.status}`);}
     const data=await res.json();
+    if(!res.ok) throw new Error(data.error||`Erro ${res.status}`);
     return data.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
   }
 
@@ -299,14 +296,6 @@ ${gmail.length>0?`📧 E-MAILS — Gmail (${gmail.length}):\n${JSON.stringify(gm
           </div>
         </div>
 
-        {/* WARNING BANNER */}
-        {!anthropicKey&&(
-          <div style={{flexShrink:0,padding:"7px 18px",background:"#FEF9EC",borderBottom:"1px solid rgba(180,150,0,.2)",fontSize:12,color:"#92650A",display:"flex",alignItems:"center",gap:8}}>
-            ⚠ <strong>Anthropic API Key não configurada.</strong>
-            <button onClick={openSetup} style={{textDecoration:"underline",background:"none",border:"none",cursor:"pointer",color:"#92650A",fontSize:12}}>Configurar →</button>
-          </div>
-        )}
-
         {/* BODY */}
         <div style={{display:"flex",flex:1,overflow:"hidden"}}>
 
@@ -359,12 +348,12 @@ ${gmail.length>0?`📧 E-MAILS — Gmail (${gmail.length}):\n${JSON.stringify(gm
           {(!isMobile||showBriefMobile)&&(
             <div style={{flex:1,overflowY:"auto",padding:isMobile?"14px":"26px 34px",background:"#F0EDE6"}}>
               {!selected
-                ?<Splash googleConnected={googleConnected} anthropicKey={anthropicKey} onSetup={openSetup} onConnect={connectGoogle} googleReady={googleReady}/>
+                ?<Splash googleConnected={googleConnected} onSetup={openSetup} onConnect={connectGoogle} googleReady={googleReady}/>
                 :anyLoading
                   ?<LoadingBrief meeting={selected} loading={loading}/>
                   :brief
                     ?<PrepBrief meeting={selected} brief={brief} pastCount={pastCount} gmailCount={gmailCount} readAiKey={readAiKey} readaiNotice={notice.readai} gmailNotice={notice.gmail} onRefresh={()=>pickMeeting(selected)}/>
-                    :<BriefError msg={notice.brief} onRetry={()=>pickMeeting(selected)} onSetup={openSetup} anthropicKey={anthropicKey}/>
+                    :<BriefError msg={notice.brief} onRetry={()=>pickMeeting(selected)} />
               }
             </div>
           )}
@@ -373,9 +362,7 @@ ${gmail.length>0?`📧 E-MAILS — Gmail (${gmail.length}):\n${JSON.stringify(gm
 
       {showSetup&&(
         <SetupModal
-          draftAk={draftAk} setDraftAk={setDraftAk}
           draftRk={draftRk} setDraftRk={setDraftRk}
-          anthropicKey={anthropicKey}
           googleConnected={googleConnected} googleReady={googleReady}
           onConnect={connectGoogle} onDisconnect={disconnectGoogle}
           onSave={saveSettings} onClose={()=>setShowSetup(false)}
@@ -409,23 +396,18 @@ function MeetingCard({meeting,isSelected,onClick}) {
   );
 }
 
-function Splash({googleConnected,anthropicKey,onSetup,onConnect,googleReady}) {
-  const allGood=googleConnected&&anthropicKey;
+function Splash({googleConnected,onSetup,onConnect,googleReady}) {
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:40,textAlign:"center"}}>
       <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:60,color:"rgba(28,53,87,.1)",lineHeight:1}}>◈</div>
       <div style={{fontSize:15,color:"rgba(26,31,46,.35)",letterSpacing:.5}}>Selecione uma reunião para gerar o briefing</div>
-      {!allGood&&(
+      {!googleConnected&&(
         <div style={{marginTop:8,padding:"16px 20px",background:"#FFF",border:"1px solid rgba(28,53,87,.1)",borderRadius:10,maxWidth:320,width:"100%"}}>
           <div style={{fontSize:11,fontWeight:600,color:"#1C3557",marginBottom:12,letterSpacing:.5,textTransform:"uppercase"}}>Configuração necessária</div>
           <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
-            {!anthropicKey&&<div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"rgba(26,31,46,.6)"}}><span style={{color:"#C2410C"}}>✗</span>Anthropic API Key</div>}
-            {!googleConnected&&<div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"rgba(26,31,46,.6)"}}><span style={{color:"#C2410C"}}>✗</span>Google Calendar & Gmail</div>}
+            <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"rgba(26,31,46,.6)"}}><span style={{color:"#C2410C"}}>✗</span>Google Calendar & Gmail</div>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {!googleConnected&&<button onClick={onConnect} style={{padding:"8px",background:"linear-gradient(135deg,#1C3557,#2C5282)",border:"none",borderRadius:7,color:"#FFF",fontSize:12,fontWeight:600,cursor:"pointer"}}>🔗 Conectar Google</button>}
-            <button onClick={onSetup} style={{padding:"8px",background:"rgba(28,53,87,.06)",border:"1px solid rgba(28,53,87,.15)",borderRadius:7,color:"#1C3557",fontSize:12,cursor:"pointer"}}>⚙ Configurar API Keys</button>
-          </div>
+          <button onClick={onConnect} style={{width:"100%",padding:"8px",background:"linear-gradient(135deg,#1C3557,#2C5282)",border:"none",borderRadius:7,color:"#FFF",fontSize:12,fontWeight:600,cursor:"pointer"}}>🔗 Conectar Google</button>
         </div>
       )}
     </div>
@@ -462,16 +444,12 @@ function LoadingBrief({meeting,loading}) {
   );
 }
 
-function BriefError({msg,onRetry,onSetup,anthropicKey}) {
-  const isKeyErr=!anthropicKey||msg?.includes("API Key")||msg?.includes("401")||msg?.includes("403");
+function BriefError({msg,onRetry}) {
   return (
     <div style={{textAlign:"center",padding:"50px 20px",color:"rgba(26,31,46,.45)"}}>
       <div style={{fontSize:26,marginBottom:12}}>⚠</div>
       <div style={{fontSize:13,color:"rgba(26,31,46,.6)",maxWidth:300,margin:"0 auto 20px",lineHeight:1.6}}>{msg||"Erro ao gerar briefing"}</div>
-      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <button onClick={onRetry} style={{padding:"9px 20px",background:"rgba(28,53,87,.07)",border:"1px solid rgba(28,53,87,.2)",borderRadius:7,color:"#1C3557",cursor:"pointer",fontSize:13}}>↻ Tentar novamente</button>
-        {isKeyErr&&<button onClick={onSetup} style={{padding:"9px 20px",background:"linear-gradient(135deg,#1C3557,#2C5282)",border:"none",borderRadius:7,color:"#FFF",cursor:"pointer",fontSize:13}}>⚙ Configurar</button>}
-      </div>
+      <button onClick={onRetry} style={{padding:"9px 20px",background:"rgba(28,53,87,.07)",border:"1px solid rgba(28,53,87,.2)",borderRadius:7,color:"#1C3557",cursor:"pointer",fontSize:13}}>↻ Tentar novamente</button>
     </div>
   );
 }
@@ -591,19 +569,6 @@ function SetupModal({draftAk,setDraftAk,draftRk,setDraftRk,anthropicKey,googleCo
               </button>
             </div>
           }
-        </div>
-
-        {/* Anthropic */}
-        <div style={{marginBottom:18}}>
-          <label style={{fontSize:10,letterSpacing:1.5,textTransform:"uppercase",color:"rgba(28,53,87,.6)",display:"block",marginBottom:6,fontWeight:600}}>
-            Anthropic API Key {!anthropicKey&&<span style={{color:"#C2410C",textTransform:"none",fontSize:10,letterSpacing:0}}>· obrigatório</span>}
-          </label>
-          <input type="password" value={draftAk} onChange={e=>setDraftAk(e.target.value)}
-            placeholder={anthropicKey?"●●●●●●●●●●●● (já configurada)":"sk-ant-..."}
-            style={{width:"100%",padding:"10px 12px",background:"#F7F5F0",border:"1px solid rgba(28,53,87,.18)",borderRadius:7,color:"#1A1F2E",fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}/>
-          <div style={{fontSize:11,color:"rgba(26,31,46,.38)",marginTop:5}}>
-            <a href="https://console.anthropic.com" target="_blank" rel="noreferrer">console.anthropic.com</a> → API Keys
-          </div>
         </div>
 
         {/* Read AI */}
